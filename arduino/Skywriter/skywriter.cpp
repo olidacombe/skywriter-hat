@@ -5,7 +5,9 @@ void _SkyWriter::begin(unsigned char pin_xfer, unsigned char pin_reset){
   this->xfer = pin_xfer;
   this->rst  = pin_reset;
   this->addr = SW_ADDR;
+#ifdef PERSIST_PROCESSING_MODE
   this->init_ready = false;
+#endif
 
   Wire.begin();
   
@@ -17,6 +19,7 @@ void _SkyWriter::begin(unsigned char pin_xfer, unsigned char pin_reset){
   delay(50);
 }
 
+#ifdef PERSIST_PROCESSING_MODE
 void _SkyWriter::write_init_data() {
   if(!digitalRead(this->xfer)) {
     pinMode(this->xfer, OUTPUT);
@@ -24,6 +27,20 @@ void _SkyWriter::write_init_data() {
 
     Wire.beginTransmission(this->addr);
     Wire.write(this->init_data, this->init_data[0]);
+    Wire.endTransmission(WIRE_STOP);
+
+    digitalWrite(this->xfer, HIGH);
+    pinMode(this->xfer, INPUT);
+  }
+}
+
+void _SkyWriter::write_persist_dsp() {
+  if(!digitalRead(this->xfer)) {
+    pinMode(this->xfer, OUTPUT);
+    digitalWrite(this->xfer, LOW);
+
+    Wire.beginTransmission(this->addr);
+    Wire.write(this->persist_dsp, this->persist_dsp[0]);
     Wire.endTransmission(WIRE_STOP);
 
     digitalWrite(this->xfer, HIGH);
@@ -48,31 +65,19 @@ unsigned char _SkyWriter::req_approach_detection() {
 unsigned char _SkyWriter::wake() {
   return this->req_approach_detection();
 }
-
-/*
-void _SkyWriter::wake() {
-  if(!digitalRead(this->xfer)) {
-    pinMode(this->xfer, OUTPUT);
-    digitalWrite(this->xfer, LOW);
-
-    Wire.requestFrom(this->addr, (unsigned char)32);
-
-    digitalWrite(this->xfer, HIGH);
-    pinMode(this->xfer, INPUT);
-  }
-}
-*/
+#endif
 
 unsigned char _SkyWriter::poll(){
+#ifdef PERSIST_PROCESSING_MODE
   if(!this->init_ready) {
     this->write_init_data();
   }
+#endif
   if (!digitalRead(this->xfer)){
     pinMode(this->xfer, OUTPUT);
     digitalWrite(this->xfer, LOW);
     
     Wire.requestFrom(this->addr, (unsigned char)32);
-    //Wire.requestFrom(this->addr, (unsigned char)32);
     
     unsigned char d_size,d_flags,d_seq,d_ident;
     
@@ -87,7 +92,6 @@ unsigned char _SkyWriter::poll(){
       this->header[3]=d_ident;
     }
     else{
-      // could this be the problem?  Not setting back to INPUT?
       digitalWrite(this->xfer, HIGH);
       pinMode(this->xfer, INPUT);
       return 0x01;
@@ -107,11 +111,14 @@ unsigned char _SkyWriter::poll(){
         this->handle_sensor_data(this->command_buffer);
         break;
       case 0x15: // 21
-        if(command_buffer[0]==0xa2 && !command_buffer[2]) {
+#ifdef PERSIST_PROCESSING_MODE
+        if(!this->init_ready && command_buffer[0]==0xa2 && !command_buffer[2]) {
           this->init_ready=true;
+          //this->write_persist_dsp();
         }
         // Status info - Unimplemented
         if(this->handle_status) this->handle_status(this->header, this->command_buffer);
+#endif
         break;
       case 0x83: // 131
         // Firmware data - Unimplemented

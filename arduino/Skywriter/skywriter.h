@@ -3,7 +3,7 @@
 #ifndef _SKYWRITER_H
 #define _SKYWRITER_H
 
-#define WIRE_STOP false
+#define WIRE_STOP true
 
 #define SW_ADDR 0x42
 
@@ -77,7 +77,6 @@ class _SkyWriter
     unsigned int  x, y, z;
     int rotation;
   private:
-    bool init_ready = false;
     void (*handle_touch)(unsigned char)   = NULL;
     void (*handle_airwheel)(int)    = NULL;
     void (*handle_gesture)(unsigned char) = NULL;
@@ -88,9 +87,14 @@ class _SkyWriter
     unsigned char command_buffer[32];
     unsigned char header[4];
     void handle_sensor_data(unsigned char* data);
+#ifdef PERSIST_PROCESSING_MODE
+    bool init_ready = false;
     void write_init_data(void);
+    void write_persist_dsp(void);
     unsigned char req_approach_detection(void);
+#endif
 
+#ifdef PERSIST_PROCESSING_MODE
     // approach detection was 0x81 (not 0x97) in older versions, maybe try this
     const unsigned char init_data[0x10] = {
       0x10, 0x00, 0x00, 0xa2,
@@ -116,6 +120,7 @@ class _SkyWriter
       0xa2, 0x00, 0x00, 0x00,
       0x97, 0x00, 0x00, 0x00
     };
+#endif
 };
 
 namespace { _SkyWriter Skywriter; }
