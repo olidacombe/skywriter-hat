@@ -60,6 +60,9 @@
 #define SW_CIRCLE_CLOCKWISE        6
 #define SW_CIRCLE_CCLOCKWISE       7
 
+#define INIT_DATA_LENGTH 5
+#define PERSIST_DSP_LENGTH 15
+
 class _SkyWriter 
 {
   public:
@@ -86,13 +89,19 @@ class _SkyWriter
     void handle_sensor_data(unsigned char* data);
 
     // approach detection was 0x81 (not 0x97) in older versions, maybe try this
-    const unsigned char init_data[15] = {
+    /*
+    const unsigned char init_data[INIT_DATA_LENGTH] = {
       0x10, 0x00, 0xa2,
       0x97, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00,
       0x01, 0x00, 0x00, 0x00
     };
-    const unsigned char persist_dsp[15] = {
+    */
+    // lifted this from python library - no idea what it means!
+    const unsigned char init_data[INIT_DATA_LENGTH] = {
+      0xa1, 0x00, 0x1f, 0x00, 0x1f
+    };
+    const unsigned char persist_dsp[PERSIST_DSP_LENGTH] = {
       0x10, 0x00, 0xa2,
       0x00, 0xff, 0x00, 0x00,
       0x01, 0x00, 0x00, 0x00,
