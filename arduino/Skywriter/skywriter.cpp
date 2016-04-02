@@ -5,6 +5,7 @@ void _SkyWriter::begin(unsigned char pin_xfer, unsigned char pin_reset){
   this->xfer = pin_xfer;
   this->rst  = pin_reset;
   this->addr = SW_ADDR;
+  this->init_ready = false;
 
   Wire.begin();
   
@@ -14,20 +15,34 @@ void _SkyWriter::begin(unsigned char pin_xfer, unsigned char pin_reset){
   delay(10);
   digitalWrite(this->rst, HIGH);
   delay(50);
-
-  this->write_init_data();
 }
 
 void _SkyWriter::write_init_data() {
-  Wire.beginTransmission(this->addr);
-  Wire.write(this->init_data, this->init_data[0]);
-  Wire.endTransmission();
+  if(!digitalRead(this->xfer)) {
+    pinMode(this->xfer, OUTPUT);
+    digitalWrite(this->xfer, LOW);
+
+    Wire.beginTransmission(this->addr);
+    Wire.write(this->init_data, this->init_data[0]);
+    Wire.endTransmission(WIRE_STOP);
+
+    digitalWrite(this->xfer, HIGH);
+    pinMode(this->xfer, INPUT);
+  }
 }
 
 unsigned char _SkyWriter::req_approach_detection() {
-  Wire.beginTransmission(this->addr);
-  Wire.write(this->req_app, this->req_app[0]);
-  return Wire.endTransmission();
+  unsigned char ret=0x00;
+  if(!digitalRead(this->xfer)) {
+    pinMode(this->xfer, OUTPUT);
+    digitalWrite(this->xfer, LOW);
+    Wire.beginTransmission(this->addr);
+    Wire.write(this->req_app, this->req_app[0]);
+    ret=Wire.endTransmission(WIRE_STOP);
+    digitalWrite(this->xfer, HIGH);
+    pinMode(this->xfer, INPUT);
+  }
+  return ret;
 }
 
 unsigned char _SkyWriter::wake() {
@@ -49,6 +64,9 @@ void _SkyWriter::wake() {
 */
 
 unsigned char _SkyWriter::poll(){
+  if(!this->init_ready) {
+    this->write_init_data();
+  }
   if (!digitalRead(this->xfer)){
     pinMode(this->xfer, OUTPUT);
     digitalWrite(this->xfer, LOW);
@@ -69,6 +87,9 @@ unsigned char _SkyWriter::poll(){
       this->header[3]=d_ident;
     }
     else{
+      // could this be the problem?  Not setting back to INPUT?
+      digitalWrite(this->xfer, HIGH);
+      pinMode(this->xfer, INPUT);
       return 0x01;
     }
     
@@ -82,14 +103,17 @@ unsigned char _SkyWriter::poll(){
     this->command_buffer[i] = '\0';
   
     switch(d_ident){
-      case 0x91:
+      case 0x91: // 145
         this->handle_sensor_data(this->command_buffer);
         break;
-      case 0x15:
+      case 0x15: // 21
+        if(command_buffer[0]==0xa2 && !command_buffer[2]) {
+          this->init_ready=true;
+        }
         // Status info - Unimplemented
-        if(this->handle_status) this->handle_status(this->header);
+        if(this->handle_status) this->handle_status(this->header, this->command_buffer);
         break;
-      case 0x83:
+      case 0x83: // 131
         // Firmware data - Unimplemented
         break;
     }
@@ -107,7 +131,7 @@ void _SkyWriter::onTouch(    void (*function)(unsigned char) ){this->handle_touc
 void _SkyWriter::onAirwheel( void (*function)(int)           ){this->handle_airwheel = function;}
 void _SkyWriter::onGesture(  void (*function)(unsigned char) ){this->handle_gesture  = function;}
 void _SkyWriter::onXYZ(      void (*function)(unsigned int,unsigned int,unsigned int) ){this->handle_xyz  = function;}
-void _SkyWriter::onStatus(  void (*function)(unsigned char *) ){this->handle_status = function;}
+void _SkyWriter::onStatus(  unsigned char (*function)(unsigned char *, unsigned char *) ){this->handle_status = function;}
 
 void _SkyWriter::handle_sensor_data(unsigned char* data){
 /*

@@ -3,6 +3,8 @@
 #ifndef _SKYWRITER_H
 #define _SKYWRITER_H
 
+#define WIRE_STOP false
+
 #define SW_ADDR 0x42
 
 #define SW_HEADER_SIZE   4
@@ -69,16 +71,17 @@ class _SkyWriter
     void onTouch( void (*)(unsigned char) );
     void onAirwheel( void (*)(int) );
     void onGesture( void (*)(unsigned char) );
-    void onStatus( void (*)(unsigned char *) );
+    void onStatus( unsigned char (*)(unsigned char *, unsigned char *) );
     void onXYZ( void (*)(unsigned int, unsigned int, unsigned int) );
     unsigned char last_gesture, last_touch;
     unsigned int  x, y, z;
     int rotation;
   private:
+    bool init_ready = false;
     void (*handle_touch)(unsigned char)   = NULL;
     void (*handle_airwheel)(int)    = NULL;
     void (*handle_gesture)(unsigned char) = NULL;
-    void (*handle_status)(unsigned char *) = NULL;
+    unsigned char (*handle_status)(unsigned char *, unsigned char *) = NULL;
     void (*handle_xyz)(unsigned int, unsigned int, unsigned int);
     int lastrotation;
     unsigned char xfer, rst, addr;
