@@ -60,19 +60,16 @@
 #define SW_CIRCLE_CLOCKWISE        6
 #define SW_CIRCLE_CCLOCKWISE       7
 
-#define INIT_DATA_LENGTH 5
-#define PERSIST_DSP_LENGTH 15
-
 class _SkyWriter 
 {
   public:
     void begin(unsigned char pin_xfer, unsigned char pin_reset);
-    void poll();
-    void wake();
+    unsigned char poll();
+    unsigned char wake();
     void onTouch( void (*)(unsigned char) );
     void onAirwheel( void (*)(int) );
     void onGesture( void (*)(unsigned char) );
-    void onStatus( void (*)(void) );
+    void onStatus( void (*)(unsigned char *) );
     void onXYZ( void (*)(unsigned int, unsigned int, unsigned int) );
     unsigned char last_gesture, last_touch;
     unsigned int  x, y, z;
@@ -81,31 +78,40 @@ class _SkyWriter
     void (*handle_touch)(unsigned char)   = NULL;
     void (*handle_airwheel)(int)    = NULL;
     void (*handle_gesture)(unsigned char) = NULL;
-    void (*handle_status)(void) = NULL;
+    void (*handle_status)(unsigned char *) = NULL;
     void (*handle_xyz)(unsigned int, unsigned int, unsigned int);
     int lastrotation;
     unsigned char xfer, rst, addr;
     unsigned char command_buffer[32];
+    unsigned char header[4];
     void handle_sensor_data(unsigned char* data);
+    void write_init_data(void);
+    unsigned char req_approach_detection(void);
 
     // approach detection was 0x81 (not 0x97) in older versions, maybe try this
-    /*
-    const unsigned char init_data[INIT_DATA_LENGTH] = {
-      0x10, 0x00, 0xa2,
+    const unsigned char init_data[0x10] = {
+      0x10, 0x00, 0x00, 0xa2,
       0x97, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00,
       0x01, 0x00, 0x00, 0x00
     };
-    */
     // lifted this from python library - no idea what it means!
-    const unsigned char init_data[INIT_DATA_LENGTH] = {
+    /*
+    const unsigned char init_data[5] = {
       0xa1, 0x00, 0x1f, 0x00, 0x1f
     };
-    const unsigned char persist_dsp[PERSIST_DSP_LENGTH] = {
-      0x10, 0x00, 0xa2,
+    */
+    const unsigned char persist_dsp[0x10] = {
+      0x10, 0x00, 0x00, 0xa2,
       0x00, 0xff, 0x00, 0x00,
       0x01, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00
+    };
+
+    const unsigned char req_app[0x0c] = {
+      0x0c, 0x00, 0x00, 0x06,
+      0xa2, 0x00, 0x00, 0x00,
+      0x97, 0x00, 0x00, 0x00
     };
 };
 

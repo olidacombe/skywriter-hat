@@ -6,24 +6,6 @@ void _SkyWriter::begin(unsigned char pin_xfer, unsigned char pin_reset){
   this->rst  = pin_reset;
   this->addr = SW_ADDR;
 
-  // approach detection was 0x81 (not 0x97) in older versions, maybe try this
-
-/*
-  const unsigned char init_data[] = {
-    0x10, 0x00, 0xa2,
-    0x97, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
-    0x01, 0x00, 0x00, 0x00
-  };
-
-  const unsigned char persist_dsp[] = {
-    0x10, 0x00, 0xa2,
-    0x00, 0xff, 0x00, 0x00,
-    0x01, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00
-  };
-*/
-  
   Wire.begin();
   
   pinMode(this->xfer, INPUT_PULLUP);
@@ -33,28 +15,23 @@ void _SkyWriter::begin(unsigned char pin_xfer, unsigned char pin_reset){
   digitalWrite(this->rst, HIGH);
   delay(50);
 
+  this->write_init_data();
+}
 
+void _SkyWriter::write_init_data() {
   Wire.beginTransmission(this->addr);
-  /*
-  Wire.write(0xa1);
-  Wire.write(0x00);
-  Wire.write(0x1f);
-  Wire.write(0x00);
-  Wire.write(0x1f);
-
-0x10 0 0 A2 | 97 00 | 00 00 | 00 00 00 00 | 01 00 00 00
-0x10 0 0 A2 | 00 FF | 00 00 | 01 00 00 00 | 00 00 00 00
-
-  */
-  Wire.write(this->init_data, 15);
-//  Wire.write(this->persist_dsp, 15);
+  Wire.write(this->init_data, this->init_data[0]);
   Wire.endTransmission();
 }
 
-void _SkyWriter::wake() {
+unsigned char _SkyWriter::req_approach_detection() {
   Wire.beginTransmission(this->addr);
-  Wire.write(this->init_data, 15);
-  Wire.endTransmission();
+  Wire.write(this->req_app, this->req_app[0]);
+  return Wire.endTransmission();
+}
+
+unsigned char _SkyWriter::wake() {
+  return this->req_approach_detection();
 }
 
 /*
@@ -71,7 +48,7 @@ void _SkyWriter::wake() {
 }
 */
 
-void _SkyWriter::poll(){
+unsigned char _SkyWriter::poll(){
   if (!digitalRead(this->xfer)){
     pinMode(this->xfer, OUTPUT);
     digitalWrite(this->xfer, LOW);
@@ -83,12 +60,16 @@ void _SkyWriter::poll(){
     
     if( Wire.available() >= 4 ){
       d_size  = Wire.read();
+      this->header[0]=d_size;
       d_flags = Wire.read();
+      this->header[1]=d_flags;
       d_seq   = Wire.read();
+      this->header[2]=d_seq;
       d_ident = Wire.read();
+      this->header[3]=d_ident;
     }
     else{
-      return;
+      return 0x01;
     }
     
     this->command_buffer[0] = '\0';
@@ -106,7 +87,7 @@ void _SkyWriter::poll(){
         break;
       case 0x15:
         // Status info - Unimplemented
-        if(this->handle_status) this->handle_status();
+        if(this->handle_status) this->handle_status(this->header);
         break;
       case 0x83:
         // Firmware data - Unimplemented
@@ -116,14 +97,17 @@ void _SkyWriter::poll(){
     
     digitalWrite(this->xfer, HIGH);
     pinMode(this->xfer, INPUT);
+
+    return d_ident;
   }
+  return 0x00;
 }
 
 void _SkyWriter::onTouch(    void (*function)(unsigned char) ){this->handle_touch    = function;}
 void _SkyWriter::onAirwheel( void (*function)(int)           ){this->handle_airwheel = function;}
 void _SkyWriter::onGesture(  void (*function)(unsigned char) ){this->handle_gesture  = function;}
 void _SkyWriter::onXYZ(      void (*function)(unsigned int,unsigned int,unsigned int) ){this->handle_xyz  = function;}
-void _SkyWriter::onStatus(  void (*function)(void) ){this->handle_status = function;}
+void _SkyWriter::onStatus(  void (*function)(unsigned char *) ){this->handle_status = function;}
 
 void _SkyWriter::handle_sensor_data(unsigned char* data){
 /*
