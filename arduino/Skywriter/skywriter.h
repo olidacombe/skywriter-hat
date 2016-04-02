@@ -65,9 +65,11 @@ class _SkyWriter
   public:
     void begin(unsigned char pin_xfer, unsigned char pin_reset);
     void poll();
+    void wake();
     void onTouch( void (*)(unsigned char) );
     void onAirwheel( void (*)(int) );
     void onGesture( void (*)(unsigned char) );
+    void onStatus( void (*)(void) );
     void onXYZ( void (*)(unsigned int, unsigned int, unsigned int) );
     unsigned char last_gesture, last_touch;
     unsigned int  x, y, z;
@@ -76,11 +78,26 @@ class _SkyWriter
     void (*handle_touch)(unsigned char)   = NULL;
     void (*handle_airwheel)(int)    = NULL;
     void (*handle_gesture)(unsigned char) = NULL;
+    void (*handle_status)(void) = NULL;
     void (*handle_xyz)(unsigned int, unsigned int, unsigned int);
     int lastrotation;
     unsigned char xfer, rst, addr;
     unsigned char command_buffer[32];
     void handle_sensor_data(unsigned char* data);
+
+    // approach detection was 0x81 (not 0x97) in older versions, maybe try this
+    const unsigned char init_data[15] = {
+      0x10, 0x00, 0xa2,
+      0x97, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      0x01, 0x00, 0x00, 0x00
+    };
+    const unsigned char persist_dsp[15] = {
+      0x10, 0x00, 0xa2,
+      0x00, 0xff, 0x00, 0x00,
+      0x01, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00
+    };
 };
 
 namespace { _SkyWriter Skywriter; }
